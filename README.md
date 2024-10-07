@@ -46,3 +46,5 @@ This project visualizes a Two-Sample Test using GradCAM, employing a Variational
  - Visualizations will be stored in the `results/ folder` (you can set this up in your code).
  - Heatmaps will show differences between two groups in test set based on GradCAM.
 
+## License
+  This project is licensed under the MIT License.
