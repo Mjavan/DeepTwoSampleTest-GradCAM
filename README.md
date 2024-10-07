@@ -23,13 +23,13 @@ This project visualizes a Two-Sample Test using GradCAM, employing a Variational
    cd DeepTwoSampleTest-GradCAM
 
 2. **Install dependencies**:
-   pip install -r requirements.txt
+   `pip install -r requirements.txt`
 
 3. **Train the Model**:
-   python src/train.py
+   `python src/train.py`
 
 4. **Visualize the Two-Sample Test**:
-   python src/visualise_two_sample_test.py
+   `python src/visualise_two_sample_test.py`
 
 5. **Additional Scripts**:
    - Generate and overlay heatmaps using `overlay_heatmap.py`
@@ -44,5 +44,5 @@ This project visualizes a Two-Sample Test using GradCAM, employing a Variational
 
 ## Results
  - Visualizations will be stored in the `results/ folder` (you can set this up in your code).
- - Heatmaps will show differences between two groups in test based on GradCAM.
+ - Heatmaps will show differences between two groups in test set based on GradCAM.
 
