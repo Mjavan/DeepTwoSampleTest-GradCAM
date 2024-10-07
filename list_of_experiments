@@ -1,0 +1,67 @@
+Training: 
+
+exp1: 50 epochs, 30'th epoch, latent_dim=10
+
+exp2: 50 epochs, 50'th epoch, latent_dim=10
+
+
+Inference:
+
+exp1
+
+
+
+Imapges:
+
+ recosntrsuctions => results 
+ 
+#### Details about Experiments
+
+Training: In training, I set norm=false, because I could not visualaize the heatmaps
+Inference: In inference, I also set norm=False
+
+Testset: In testset, I chose two classes for heatmap generation. Half of them belongs to one class,
+the other half belongs to other class
+
+#### Details about experiments that I visualised the heatmaps
+
+for exp4 I backprobagated test-statistic on to the group X
+
+
+#### Details about codes that I wrote:
+dataset:
+    dataloader2.py => I took, train, val and test set from here
+
+Heatmap generation: 
+    gradcam1.py => here I used both (abs) and (relu) function applied on linear combination of activation maps
+    
+Inference on Test set:
+    Visualise_Two_Sample_Test2.py => Here I applied trained vae on test-set (main code) implimenting Grad-CAM by myself 
+    
+    Visualise_Two_Sample_Test.py => Here I used captum library that didn't work
+    
+Overlaying heatmaps on Images:
+
+    Overlay_Heatmap.py 
+    
+Statistical Test and Clustering:
+    
+    StatisticalTest.py => Here, I perform different statistical tests including DeepTwoSampleTest
+    
+    embeddingtest.py => MMDTest from Matthias
+
+
+#### List of directories to save images and heatmaps
+
+svd_dir_heatmap = root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'heatmaps'
+svd_dir_image = root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'images'
+svd_dir_overlay = root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'overlays'
+
+
+
+
+
+
+
+
+

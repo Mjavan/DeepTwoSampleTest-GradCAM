@@ -1,0 +1,40 @@
+# ignore checkpoints
+*.ckpt
+# ignore slurm files
+*.slurm
+
+# ignore specific directories
+clusters/
+data/
+dhc/
+embeddings/
+heatmap_embeddings/
+heatmaps/
+Lightning/
+logs/
+loss/
+Redundant_Codes/
+results/
+Two_Test/
+list_of_codes/
+list_of_experiments/
+
+# ignore specific files
+inference.py
+info_data.py
+meanstd.py
+embeddingheatmap.py
+Note_about_GradCAM.ipynb
+
+# If these files might appear in subdirectories as well
+**/img.pt
+**/latents.pt
+**/lcls.npy
+**/lval.npy
+
+# prevent accidently ignoring .gitignore file itself
+!.gitignore
+
+
+
+
