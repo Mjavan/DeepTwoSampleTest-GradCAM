@@ -19,7 +19,7 @@ This project visualizes a Two-Sample Test using GradCAM, employing a Variational
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/DeepTwoSampleTest-GradCAM.git
+   git clone https://github.com/Mjavan/DeepTwoSampleTest-GradCAM.git
    cd DeepTwoSampleTest-GradCAM
 
 2. **Install dependencies**:
