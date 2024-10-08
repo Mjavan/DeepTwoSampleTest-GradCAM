@@ -3,6 +3,12 @@
 # ignore slurm files
 *.slurm
 
+# ignore notebook checkpoints
+.ipynb_checkpoints/
+
+# ignore __pycache__ file
+__pycache__/
+
 # ignore specific directories
 clusters/
 data/
