@@ -16,8 +16,8 @@ loss/
 Redundant_Codes/
 results/
 Two_Test/
-list_of_codes/
-list_of_experiments/
+list_of_codes
+list_of_experiments
 
 # ignore specific files
 inference.py
