@@ -118,14 +118,14 @@ parser.add_argument('--norm', type=bool, default=False, help='If we normalized d
 # Heatmap visualizations
 parser.add_argument('--group', type=str, default='XY', choices=['X', 'Y', 'XY'],
                     help='Which group we want to consider for backpropagating test statistic!')
-parser.add_argument('--relu', type=bool, default=True, help='If relu applied on heatmaps in Gradcam or not!')
-parser.add_argument('--start', type=int, default=2,
+parser.add_argument('--relu', type=bool, default=False, help='If relu applied on heatmaps in Gradcam or not!')
+parser.add_argument('--start', type=int, default=1,
                     help='The min percentage of (most/least) important features that we masked in each individual image!')
-parser.add_argument('--perc', type=int, default=2,
+parser.add_argument('--perc', type=int, default=50,
                     help='The max percentage of (most/least) important features that we masked in each individual image!')
 parser.add_argument('--mask_type', type=str, default='most', choices=['most', 'least'],
                         help='If we want to mask most or lest importnat features!')
-parser.add_argument('--sub_test', type=int, default=1, choices=(1, 5, 10, 20, 40, 50, 60, 70, 80, 90, 100),
+parser.add_argument('--sub_test', type=int, default=30, choices=(1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100),
                     help='Percent of test set images that we want to mask their (most/least) important features!')
 
 args = parser.parse_args()
