@@ -140,7 +140,7 @@ class TestStatisticBackprop:
 
     def save_attributions(self, attributions, group_label, latent_dim_idx=None):
         """Save the generated attributions to file."""
-        base_path = os.path.join(self.svd_dir_heatmap, f'{self.args.seed}_{self.args.exp}_{self.args.latentvar}')
+        base_path = os.path.join(self.svd_dir_heatmap, f'{self.args.seed}_{self.args.exp}_{self.args.latentvar}_{self.args.target_layer}')
         os.makedirs(base_path, exist_ok=True)
         if latent_dim_idx:
             file_name = f'{self.args.latentcls}_{group_label}_{self.args.relu}_{latent_dim_idx}_heatmap.npy'
@@ -203,7 +203,7 @@ parser.add_argument('--latentcls',type=float,nargs="+",default=[1,2], help='the 
 parser.add_argument('--norm', type=bool, default=False, help='If we want to normalize data or not.')
 # Heatmap visualizations
 parser.add_argument('--group', type=str, default='XY',choices=['X','Y','XY'],help='Which group we want to consider for backprobagating test statistic!')
-parser.add_argument('--backprop_type', type=str, default='latent_dim', choices= ('test_statistic','latent_dim'))
+parser.add_argument('--backprop_type', type=str, default='test_statistic', choices= ('test_statistic','latent_dim'))
 parser.add_argument('--latent_dim_idx', type=int, default=3)
 parser.add_argument('--relu', type=bool, default=True, help='If we apply relu on heatmaps in GradCAM!')               
 

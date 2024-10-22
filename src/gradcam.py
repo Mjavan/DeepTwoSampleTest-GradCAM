@@ -59,6 +59,7 @@ class GradCAM(ProbBase):
         #print(f'outputs_forward:{self.outputs_forward.values()}\n')
         
         for module in self.model.named_modules():
+            print(f'module[0]:{module[0]}')
             if module[0] == self.target_layer:
                 module[1].register_backward_hook(func_b) # saves output of backward pass
                 module[1].register_forward_hook(func_f)  # saves output of forward pass
