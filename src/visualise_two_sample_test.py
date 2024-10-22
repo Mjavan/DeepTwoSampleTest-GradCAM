@@ -1,239 +1,223 @@
-## main code for my experiments
 ### import libraries
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, random_split
-from torchvision import transforms
-from torchvision.datasets import ImageFolder
-import os
-import numpy as np
-import pandas as pd
+from torch.utils.data import DataLoader
 from pathlib import Path
+import numpy as np
 import random
+import os
 import argparse
 try:
     import cPickle as pickle
-except:
+except ImportError:
     import pickle
 
 from dataloader import dSprites
 from model import VAE
 from gradcam import GradCAM
 
+class TestStatisticBackprop:
+    def __init__(self, args):
+        self.args = args
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.latent_variable_mapping = {
+            'color': 0,
+            'shape': 1,
+            'scale': 2,
+            'orientation': 3,
+            'position X': 4,
+            'position Y': 5
+        }
+        self.latent_idx = self.latent_variable_mapping[args.latentvar]
+        self.setup_experiment()
 
-parser = argparse.ArgumentParser(description='Visualaizing Two-Sample Test VAE')
-
-# Training parameters
-parser.add_argument('--seed', type=int, default=42,
-                    help='random seed (default: 42)')
-parser.add_argument('--exp',type=int,default=4,
-                    help='ID of the current expriment!')
-parser.add_argument('--bs', type=int, default=128,
-                    help='input batch size for training (default: 128)')
-# Model parameters    
-parser.add_argument('--latent_dim', type=int, default=10,
-                    help='latent vector size of encoder')
-parser.add_argument('--best_model',type=bool, default=True,
-                    help='If True load the best checkpoint otherwise last one.')
-parser.add_argument('--target_layer', type=str, default='encoder.conv2',
-                    choices=('conv1','conv2','conv3','conv4'),
-                    help='select a target layer for generating attention map.')
-parser.add_argument('--single_output', type=bool, default=False,
-                    help='if true, only returns mean in VAE.')
-
-# Dataset parameters
-parser.add_argument('--latentvar',type=str,default='shape',
-                    choices=('shape','scale','orientation','position'),
-                    help='the latent varibale for defining groups!')
-parser.add_argument('--latentcls',type=float,nargs="+",default=[1,2],
-                    help='the latent class for defining groups!')
-parser.add_argument('--norm', type=bool, default=False,
-                    help='If we want to normalize data or not.')
-# Heatmap visualizations
-parser.add_argument('--group', type=str, default='XY',choices=['X','Y','XY'],
-                    help='Which group we want to consider for backprobagating test statistic!')
-parser.add_argument('--relu', type=bool, default=True,
-                   help='If we apply relu on heatmaps in GradCAM!')
-parser.add_argument('--save_gcam_image', type=bool, default=True,
-                    help='If we want to visualize heatmaps or not!')
-parser.add_argument('--save_image', type=bool, default=False,
-                    help='If we want to save images or not!')
-
-args = parser.parse_args()
-
-def main(args):
-    seed =args.seed
-    torch.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    random.seed(seed)
-    np.random.seed(seed)
-    
-    # directory for loading checkpoints
-    root_dir = Path('/dhc/home/masoumeh.javanbakhat/netstore-old/Baysian/3D')
-    svd_split = root_dir/'Explainability'/'Reproducibility'/'data'
-    save_dir_ckpts = root_dir / 'Explainability' / 'Codes' / 'ckpts'
-    svd_dir_heatmap = root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'heatmaps'
-    svd_dir_image = root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'images'
-    
-    # set device
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    use_cuda = torch.cuda.is_available()
-    
-    latent_variable_mapping = {
-    'color': 0,
-    'shape': 1,
-    'scale': 2,
-    'orientation': 3,
-    'position X': 4,
-    'position Y': 5}
-    latent_idx = latent_variable_mapping[args.latentvar]
-    
-    # making test set & test loader
-    with open(
-        svd_split/f'test_set_dSprites_{args.seed}_{args.latentvar}_{args.latentcls}_{args.norm}.pickle',
-        'rb') as f:
-        testset = pickle.load(f)
-    test_loader = DataLoader(testset, batch_size=args.bs, shuffle=False)
-    print(f'len testset:{len(test_loader.dataset)}\n')
-    print(f'number of batches:{len(test_loader)}\n')
-    
-    vae = VAE(args.latent_dim, args.single_output).to(device)
-    
-    # load checkpoints 
-    if args.best_model:
-        model_path = os.path.join(save_dir_ckpts,f'{args.exp}_{args.seed}_{args.latentvar}_{args.latentcls}_best_model.pt')
-        print(f'Best model is loaded!')    
-    else:
-        model_path = os.path.join(save_dir_ckpts,f'{args.exp}_{args.seed}_{args.latentvar}_{args.latentcls}_last_model.pt')
-        print(f'\nLast model is loaded!')
-    ckp_dict = torch.load(model_path, map_location=device)
-    vae.load_state_dict(ckp_dict['state_dict'])
-    
-    vae.eval()
-    
-    # Instantiate GradCAM
-    gcam = GradCAM(vae, target_layer=args.target_layer, relu=args.relu, device=device)
-    
-    # Initialize variables to store sums and counts
-    sum_fX = torch.zeros(args.latent_dim).to(device)
-    sum_fY = torch.zeros(args.latent_dim).to(device)
-    count_fX = 0
-    count_fY = 0
-    group1_images = []
-    group2_images = []
-    
-    for batch_idx,(x_batch, target_batch) in enumerate(test_loader):
-        x_batch = x_batch.to(device)
-        target_batch = target_batch.to(device)
+    def setup_experiment(self):
+        """Set random seeds, directories, and test loader."""
+        seed = self.args.seed
+        torch.manual_seed(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        random.seed(seed)
+        np.random.seed(seed)
         
-        # performs forward pass
-        _,mu,_ = gcam.forward(x_batch)
+        # Directory for loading checkpoints and saving outputs
+        self.root_dir = Path('/dhc/home/masoumeh.javanbakhat/netstore-old/Baysian/3D')
+        self.svd_split = self.root_dir / 'Explainability' / 'Reproducibility' / 'data'
+        self.save_dir_ckpts = self.root_dir / 'Explainability' / 'Codes' / 'ckpts'
+        self.svd_dir_heatmap = self.root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'heatmaps'
+        self.svd_dir_image = self.root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'images'
         
-        # Calculate running sum and count for class X
-        if all(target_batch[:, latent_idx] == args.latentcls[0]):
-            if 0 <= batch_idx <= 610:
-                sum_fX += mu.sum(dim=0)
-                count_fX += mu.size(0)
-                group1_images.append(x_batch.cpu())
-        # Calculate running sum and count for class Y
-        elif all(target_batch[:, latent_idx] == args.latentcls[1]):
-            if 1920<=batch_idx<=2530:
-                sum_fY += mu.sum(dim=0)
-                count_fY += mu.size(0)
-                group2_images.append(x_batch.cpu())
-    
-    print(f'count_fX:{count_fX}')
-    print(f'count_fY:{count_fY}\n')
-    
-    # Convert lists of images to a single tensor
-    group1_images_tensor = torch.cat(group1_images)
-    group2_images_tensor = torch.cat(group2_images)
-    
-    print(f'group1_size:{group1_images_tensor.size()}')
-    print(f'group2_size:{group2_images_tensor.size()}\n')
-    
-    if args.save_image:
-        group1_images_np = group1_images_tensor.cpu().numpy()
-        group2_images_np = group2_images_tensor.cpu().numpy()
-        base_path_img = os.path.join(svd_dir_image, f'{args.seed}_{args.exp}_{args.latentvar}')
-        os.makedirs(base_path_img,exist_ok=True)
-        file_name_imgX = f'{args.latentcls}_X.npy'
-        file_name_imgY = f'{args.latentcls}_Y.npy'
-        full_path_imgX = os.path.join(base_path_img, file_name_imgX)
-        full_path_imgY = os.path.join(base_path_img, file_name_imgY)
+        self.load_test_set()
+
+    def load_test_set(self):
+        """Load test dataset."""
+        test_set_path = self.svd_split / f'test_set_dSprites_{self.args.seed}_{self.args.latentvar}_{self.args.latentcls}_{self.args.norm}.pickle'
+        with open(test_set_path, 'rb') as f:
+            testset = pickle.load(f)
+        self.test_loader = DataLoader(testset, batch_size=self.args.bs, shuffle=False)
+        print(f'len testset: {len(self.test_loader.dataset)}')
+        print(f'number of batches: {len(self.test_loader)}')
+
+    def load_vae_model(self):
+        """Load pre-trained VAE model."""
+        vae = VAE(self.args.latent_dim, self.args.single_output).to(self.device)
+        if self.args.best_model:
+            model_path = os.path.join(self.save_dir_ckpts, f'{self.args.exp}_{self.args.seed}_{self.args.latentvar}_{self.args.latentcls}_best_model.pt')
+            print('Best model loaded!')
+        else:
+            model_path = os.path.join(self.save_dir_ckpts, f'{self.args.exp}_{self.args.seed}_{self.args.latentvar}_{self.args.latentcls}_last_model.pt')
+            print('Last model loaded!')
         
-        # Save the numpy images
-        np.save(full_path_imgX,group1_images_np)
-        np.save(full_path_imgY,group2_images_np)
-                
-    # Compute the means
-    mean_fX = sum_fX / count_fX if count_fX > 0 else torch.zeros(latent_dim).to(device)
-    mean_fY = sum_fY / count_fY if count_fY > 0 else torch.zeros(latent_dim).to(device)
-    
-    # Compute the test statistic
-    D = mean_fX - mean_fY    
-    
-    del sum_fX, sum_fY
-    torch.cuda.empty_cache()
-    
-    print(f'Dimension of D:{D.size()}\n')
-                
-    statistic = torch.sum(torch.pow(D, 2))
-    
-    print(f'test_statistic:{statistic}')
-    
-    def process_in_batches(tensor_data, batch_size):
+        ckp_dict = torch.load(model_path, map_location=self.device)
+        vae.load_state_dict(ckp_dict['state_dict'])
+        vae.eval()
+        return vae
+
+    def calculate_test_statistics(self, vae):
+        """Calculate the test statistic for the difference between two groups."""
+        sum_fX = torch.zeros(self.args.latent_dim).to(self.device)
+        sum_fY = torch.zeros(self.args.latent_dim).to(self.device)
+        count_fX, count_fY = 0, 0
+        group1_images, group2_images = [], []
+
+        # Instantiate GradCAM for feature attribution
+        gcam = GradCAM(vae, target_layer=self.args.target_layer, relu=self.args.relu, device=self.device)
+
+        for batch_idx, (x_batch, target_batch) in enumerate(self.test_loader):
+            x_batch = x_batch.to(self.device)
+            target_batch = target_batch.to(self.device)
+            
+            # Forward pass
+            _, mu, _ = gcam.forward(x_batch)
+            
+            # Accumulate stats for group X
+            if all(target_batch[:, self.latent_idx] == self.args.latentcls[0]):
+                if 0 <= batch_idx <= 610:
+                    sum_fX += mu.sum(dim=0)
+                    count_fX += mu.size(0)
+                    group1_images.append(x_batch.cpu())
+            
+            # Accumulate stats for group Y
+            elif all(target_batch[:, self.latent_idx] == self.args.latentcls[1]):
+                if 1920 <= batch_idx <= 2530:
+                    sum_fY += mu.sum(dim=0)
+                    count_fY += mu.size(0)
+                    group2_images.append(x_batch.cpu())
+
+        print(f'count_fX: {count_fX}')
+        print(f'count_fY: {count_fY}')
+
+        # Calculate mean embeddings
+        mean_fX = sum_fX / count_fX if count_fX > 0 else torch.zeros(self.args.latent_dim).to(self.device)
+        mean_fY = sum_fY / count_fY if count_fY > 0 else torch.zeros(self.args.latent_dim).to(self.device)
+
+        # Compute the test statistic D (dimension of latent vector)
+        D = mean_fX - mean_fY
+        test_statistic = torch.sum(torch.pow(D, 2))
+
+        group1_images_tensor = torch.cat(group1_images)
+        group2_images_tensor = torch.cat(group2_images)
+
+        return test_statistic, D, group1_images_tensor, group2_images_tensor
+
+    def process_attributions(self, gcam, original_images, backprop_value):
+        """Process and return GradCAM attributions in batches."""
         attributions_list = []
-        num_batches = (tensor_data.size(0) + batch_size - 1) // batch_size
-        print(f'num_batches:{num_batches}\n')
+        num_batches = (original_images.size(0) + self.args.bs - 1) // self.args.bs
+        print(f'num_batches: {num_batches}')
+
         for i in range(num_batches):
-            print(f'batch:{i}\n')
-            batch_data = tensor_data[i * batch_size:(i + 1) * batch_size].to(device)
-            # Perform forward pass again
+            print(f'batch: {i}')
+            batch_data = original_images[i * self.args.bs: (i + 1) * self.args.bs].to(self.device)
             _, mu, _ = gcam.forward(batch_data)
-            gcam.backward(statistic)
+            gcam.backward(backprop_value)
             attributions = gcam.generate()
             attributions = attributions.squeeze().cpu().data.numpy()
             attributions_list.append(attributions)
-        attributions_np = np.vstack(attributions_list)
-        print(f'attributions:{attributions_np.shape}')
-        return attributions_np
+
+        return np.vstack(attributions_list)
+
+    def save_attributions(self, attributions, group_label, latent_dim_idx=None):
+        """Save the generated attributions to file."""
+        base_path = os.path.join(self.svd_dir_heatmap, f'{self.args.seed}_{self.args.exp}_{self.args.latentvar}')
+        os.makedirs(base_path, exist_ok=True)
+        if latent_dim_idx:
+            file_name = f'{self.args.latentcls}_{group_label}_{self.args.relu}_{latent_dim_idx}_heatmap.npy'
+        full_path = os.path.join(base_path, file_name)
+        np.save(full_path, attributions)
+
+    def run(self, backprop_type='test_statistic', latent_dim_idx=None):
+        """Main experiment function."""
+        vae = self.load_vae_model()
+        test_statistic, D, group1_images_tensor, group2_images_tensor = self.calculate_test_statistics(vae)
+        print(f'test_statistic: {test_statistic:0.4f}, D:{D}\n')
+
+        # Determine which value to backpropagate (test-statistic or specific latent dimension)
+        if backprop_type == 'test_statistic':
+            backprop_value = test_statistic
+            print(f'Backpropagating test-statistic with value: {test_statistic}\n')
+        elif backprop_type == 'latent_dim':
+            if latent_dim_idx is None or latent_dim_idx >= self.args.latent_dim:
+                raise ValueError(f"Invalid latent dimension index: {latent_dim_idx}")
+            backprop_value = D[latent_dim_idx]
+            print(f'Backpropagating latent dimension {latent_dim_idx} with value: {backprop_value}\n')
+        else:
+            raise ValueError("Invalid backpropagation type. Choose 'test_statistic' or 'latent_dim'.")
+
+        # Instantiate GradCAM again for attribution processing
+        gcam = GradCAM(vae, target_layer=self.args.target_layer, relu=self.args.relu, device=self.device)
+
+        # Determine which group to use for backpropagation
+        if self.args.group == 'X':
+            print('Group X selected')
+            attributions = self.process_attributions(gcam, group1_images_tensor, backprop_value)
+            self.save_attributions(attributions, 'X',latent_dim_idx)
+        elif self.args.group == 'Y':
+            print('Group Y selected')
+            attributions = self.process_attributions(gcam, group2_images_tensor, backprop_value)
+            self.save_attributions(attributions, 'Y',latent_dim_idx)
+        else:
+            print('Both groups (XY) selected')
+            original_images = torch.cat((group1_images_tensor, group2_images_tensor), dim=0)
+            attributions = self.process_attributions(gcam, original_images, backprop_value)
+            self.save_attributions(attributions, 'XY',latent_dim_idx)
+
+
+parser = argparse.ArgumentParser(description='Visualizing Two-Sample Test VAE')
+
+# Training parameters
+parser.add_argument('--seed', type=int, default=42)
+parser.add_argument('--exp', type=int, default=4)
+parser.add_argument('--bs', type=int, default=128)
     
-    if args.group == 'X':
-        print(f'group_X was chosen\n')
-        original_images = group1_images_tensor
-        attributions = process_in_batches(original_images, args.bs)
+# Model parameters
+parser.add_argument('--latent_dim', type=int, default=10)
+parser.add_argument('--best_model', type=bool, default=True)
+parser.add_argument('--target_layer', type=str, default='encoder.conv2', choices=('conv1', 'conv2', 'conv3', 'conv4'))
+parser.add_argument('--single_output', type=bool, default=False)
     
-    elif args.group == 'Y':
-        print(f'group_Y was chosen')
-        original_images = group2_images_tensor
-        attributions = process_in_batches(original_images, args.bs)
-        
-    elif args.group == 'XY':
-        print(f'group_XY was chosen')
-        original_images = torch.cat((group1_images_tensor,group2_images_tensor),dim=0)
-        print(f'original_images:{original_images.size()}')
-        attributions = process_in_batches(original_images, args.bs)
-        
-    # Let's look at attribution map shape and save them
-    base_path = os.path.join(svd_dir_heatmap, f'{args.seed}_{args.exp}_{args.latentvar}')
-    os.makedirs(base_path,exist_ok=True)
-    file_name = f'{args.latentcls}_{args.group}_{args.relu}_heatmap.npy'
-    full_path = os.path.join(base_path, file_name)
+# Dataset parameters
+parser.add_argument('--latentvar', type=str, default='shape', choices=('shape', 'scale', 'orientation', 'position'))
+parser.add_argument('--latentcls',type=float,nargs="+",default=[1,2], help='the latent class for defining groups!')
+parser.add_argument('--norm', type=bool, default=False, help='If we want to normalize data or not.')
+# Heatmap visualizations
+parser.add_argument('--group', type=str, default='XY',choices=['X','Y','XY'],help='Which group we want to consider for backprobagating test statistic!')
+parser.add_argument('--backprop_type', type=str, default='latent_dim', choices= ('test_statistic','latent_dim'))
+parser.add_argument('--latent_dim_idx', type=int, default=3)
+parser.add_argument('--relu', type=bool, default=True, help='If we apply relu on heatmaps in GradCAM!')               
+
+args = parser.parse_args()
+
+
+def main(args):
     
-    # Save the numpy array
-    np.save(full_path, attributions)
-         
+    backprop_test = TestStatisticBackprop(args)
     
-if __name__=='__main__':
+    backprop_test.run(backprop_type=args.backprop_type, latent_dim_idx=args.latent_dim_idx)
+            
+if __name__ == '__main__':
+    
     main(args)
-        
-    
-        
-    
-    
-    
-    
-    
+
+                    

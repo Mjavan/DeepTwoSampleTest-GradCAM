@@ -3,11 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import OrderedDict
 
+from attention import SpatialAttention, ChannelAttention
+
 class ProbBase(object):
-    def __init__(self, model, target_layer, relu, device):
+    def __init__(self, model, target_layer, relu, device, attention=None):
         self.model = model
         self.device = device
         self.relu = relu
+        self.attention = SpatialAttention().to(self.device) if attention == 'spatial' else (ChannelAttention().to(self.device) if attention == 'channel' else None)
         self.model.to(self.device)
         self.model.eval()
         self.target_layer = target_layer
@@ -26,11 +29,16 @@ class ProbBase(object):
     def backward(self, statistic):
         self.model.zero_grad()
         self.statistic = statistic.to(self.device)
+        #print("Before backward, test statistic grad_fn:", self.statistic.grad_fn)
         self.statistic.backward(retain_graph=True)
+        #for name, param in self.model.named_parameters():
+            #if param.grad is not None:
+                #print(f"Gradient for {name} after backward pass: {param.grad}")
+            #else:
+                #print(f"No gradient computed for {name}")
     
     def get_conv_outputs(self, outputs, target_layer):
         for key, value in outputs.items():
-            #print(f'key:{key}, value:{value}')
             for module in self.model.named_modules():
                 if id(module[1]) == key:
                     if module[0] == target_layer:
@@ -43,7 +51,7 @@ class GradCAM(ProbBase):
         def func_b(module, grad_in, grad_out):
             self.outputs_backward[id(module)] = grad_out[0].cpu()
             
-        #print(f'outputs_backward:{self.outputs_backward.values()}\n')
+        print(f'outputs_backward:{self.outputs_backward.values()}\n')
         
         def func_f(module, input, f_output):
             self.outputs_forward[id(module)] = f_output
@@ -69,7 +77,7 @@ class GradCAM(ProbBase):
         self.grads = self.get_conv_outputs(self.outputs_backward, self.target_layer)
         #print(f'\nGetting gradient in generate:{self.grads.shape}')
         
-        # compute weithts based on the gradient:a_{k}^{c} = GAP(dy^{c}/d(A_{ij}^{k}))
+        # compute weithts based on the gradient:a_{k}^{c} = GAP(d(dmmd)/d(A_{ij}^{k}))
         # get alpha=weights: torch_tensor:([128, 64, 1, 1]),torch.float32
         self.compute_gradient_weights()
         #print(f'\nComputing coefficients alpha using GAP:{self.alpha.shape},{self.alpha.dtype}')
@@ -78,6 +86,11 @@ class GradCAM(ProbBase):
         # shape:torch tensor [128, 64, 16, 16]
         self.activation = self.get_conv_outputs(self.outputs_forward, self.target_layer)
         #print(f'\nShape and type activateions A_k:{self.activation.shape},{self.activation.dtype}')
+        # let's see if attention helps rfinement 
+        if self.attention:
+            print('attention was applied')
+            attention_weights = self.attention(self.activation)
+            self.activation = self.activation * attention_weights
         
         self.activation = self.activation[None, :, :, :, :]
         self.alpha = self.alpha[:, None, :, :, :]

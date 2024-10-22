@@ -23,10 +23,12 @@ class FeatureMasking:
         self.svd_dir_image = self.root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'images'
         self.svd_dir_masked = self.root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'masked'
         self.svd_dir_masked_least = self.root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'masked_least'
+        self.svd_dir_masked_non_imp = self.root_dir / 'Explainability' / 'Codes' / 'Two_Test' / 'masked_non_imp'
         
         # Create directories if they don't exist
         os.makedirs(self.svd_dir_masked, exist_ok=True)
         os.makedirs(self.svd_dir_masked_least, exist_ok=True)
+        os.makedirs(self.svd_dir_masked_non_imp, exist_ok=True)
         
         # Initialize random seed for reproducibility
         self._set_random_seed()
@@ -110,7 +112,34 @@ class FeatureMasking:
             masked_images_least_array[i] = masked_image_least
             
         self._save_masked_images(masked_images_least_array, percentage, self.svd_dir_masked_least, "least")
+        
+    def mask_non_important_features(self, percentage):
+        num_images, height, width = self.imgs.shape
+        masked_images_non_imp_array = np.zeros((num_images, height, width), dtype=self.imgs[0].dtype)
+        
+        for i in range(len(self.heatmaps)):
+            heatmap = self.heatmaps[i]
+            image = self.imgs[i]
+            non_important_features_mask = heatmap <= 0
+            non_important_indices = np.nonzero(non_important_features_mask)
+            # Step 2: Calculate how many non-important features to mask
+            num_non_important_features = len(non_important_indices[0])
+            num_elements_to_mask = int(percentage / 100 * num_non_important_features)
+            
+            # Step 3: Randomly select non-important features to mask
+            if num_elements_to_mask > 0:
+                random_indices = np.random.choice(num_non_important_features, size=num_elements_to_mask, replace=False)
+                selected_indices = (non_important_indices[0][random_indices], non_important_indices[1][random_indices])
+                mask = np.zeros_like(image, dtype=bool)
+                for row, col in zip(selected_indices[0], selected_indices[1]):
+                    mask[row, col] = True
 
+            # Step 5: Apply the mask to the image
+            masked_image = np.where(mask, 0, image)
+            masked_images_non_imp_array[i] = masked_image
+            
+        self._save_masked_images(masked_images_non_imp_array, percentage, self.svd_dir_masked_non_imp, "non_imp")
+         
     def _save_masked_images(self, masked_images, percentage, save_dir, mask_type):
         file_base_dir = os.path.join(save_dir, f'{self.seed}_{self.exp}_{self.latentvar}')
         os.makedirs(file_base_dir, exist_ok=True)
@@ -119,7 +148,7 @@ class FeatureMasking:
         np.save(full_path, masked_images)
         print(f'Saved {percentage}% {mask_type} important features masked images to {full_path}')
 
-parser = argparse.ArgumentParser(description='Masking important features of VAE!')
+parser = argparse.ArgumentParser(description='Masking most/least/non_imp important features of VAE!')
     
 # Training parameters
 parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
@@ -135,10 +164,10 @@ parser.add_argument('--norm', type=bool, default=False, help='If data was normal
 parser.add_argument('--group', type=str, default='XY', choices=['X', 'Y', 'XY'],
                         help='Which group to consider for backpropagating the test statistic!')
 parser.add_argument('--relu', type=bool, default=True, help='If ReLU applied on heatmaps in Grad-CAM or not!')
-parser.add_argument('--start', type=int, default=2, help='The min percentage of important features to mask (default: 1%)')
-parser.add_argument('--perc', type=int, default=2, help='The max percentage of important features to mask (default: 50%)')
-parser.add_argument('--mask_type', type=str, default='most', choices=['most', 'least'],
-                        help='If we want to mask most importnat or lest importnat features!')
+parser.add_argument('--start', type=int, default=2, help='The min percentage of features to mask (default: 1%)')
+parser.add_argument('--perc', type=int, default=60, help='The max percentage of features to mask (default: 50%)')
+parser.add_argument('--mask_type', type=str, default='non_imp', choices=['most', 'least','non_imp'],
+                        help='The type of masking: mask most/least/non_imp importnat features!')
 
 args = parser.parse_args()
 
@@ -149,7 +178,7 @@ def main(args):
     # Load data (images and heatmaps)
     feature_masker.load_data()
     
-    # Mask most important features for 1:args.per % 
+    # Mask most important features for varying percentages: 1:args.per% 
     if args.mask_type=='most':
         for percentage in range(args.start,args.perc+1):
             feature_masker.mask_most_important_features(percentage)
@@ -157,6 +186,10 @@ def main(args):
     # Mask least important features (can change the percentage as needed)
     if args.mask_type=='least':
         feature_masker.mask_least_important_features(args.perc)
+    
+    # Mask non important features (can change the percentage as needed)    
+    if args.mask_type=='non_imp':
+        feature_masker.mask_non_important_features(args.perc)
 
 
 if __name__ == "__main__":
