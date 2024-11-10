@@ -44,10 +44,12 @@ class HeatmapOverlay:
 
     def load_heatmaps(self):
         """Loads the heatmaps using memory mapping."""
-        base_path = os.path.join(self.svd_dir_heatmap, f'{self.args.seed}_{self.args.exp}_{self.args.latentvar}')
+        base_path = os.path.join(self.svd_dir_heatmap, f'{self.args.seed}_{self.args.exp}_{self.args.latentvar}_{self.args.target_layer[8:]}')
         file_name = f'{self.args.latentcls}_{self.args.group}_{self.args.relu}'
         if self.args.attention:
             file_name += f'_{self.args.attention}'
+        if self.args.backprop_type=='latent_dim':
+            file_name += f'_{self.args.latent_dim_idx}'
         file_name += '_heatmap.npy'    
         full_path = os.path.join(base_path, file_name)
         
@@ -57,13 +59,15 @@ class HeatmapOverlay:
 
     def prepare_overlay_directory(self):
         """Creates the overlay directory and returns its path."""
-        base_path_ov = os.path.join(self.svd_dir_overlay, f'{self.args.seed}_{self.args.exp}_{self.args.latentvar}')
+        base_path_ov = os.path.join(self.svd_dir_overlay, f'{self.args.seed}_{self.args.exp}_{self.args.latentvar}_{self.args.target_layer[8:]}')
         os.makedirs(base_path_ov, exist_ok=True)
 
         # Create directories based on ReLU application
         relu_path = f'relu_{self.args.relu}'
         if self.args.attention:
             relu_path += f'_{self.args.attention}'
+        if self.args.backprop_type=='latent_dim':
+            relu_path += f'_{self.args.latent_dim_idx}'
         base_path_ov_relu = os.path.join(base_path_ov, relu_path)
         print(base_path_ov_relu)
         os.makedirs(base_path_ov_relu, exist_ok=True)
@@ -108,16 +112,21 @@ parser.add_argument('--bs', type=int, default=128, help='input batch size for tr
 parser.add_argument('--latentvar', type=str, default='shape', choices=('shape', 'scale', 'orientation', 'position'),
                         help='the latent variable for defining groups!')
 parser.add_argument('--latentcls', type=float, nargs="+", default=[1, 2], help='the latent class for defining groups!')
+parser.add_argument('--target_layer', type=str, default='encoder.conv3', choices=('conv1', 'conv2', 'conv3', 'conv4'),
+                   help='The layer that we want to backprobagate gradient')
+parser.add_argument('--backprop_type', type=str, default='test_statistic', choices= ('test_statistic','latent_dim'))
+parser.add_argument('--latent_dim_idx', type=int, default=4,
+                   help='Dimension of the latent vecor that we want to backprobagte')
 parser.add_argument('--norm', type=bool, default=False, help='If we want to normalize data or not.')
 
 # Heatmap visualizations
 parser.add_argument('--group', type=str, default='XY', choices=['X', 'Y', 'XY'],
                         help='Which group we considered for backpropagating test statistic!')
 parser.add_argument('--relu', type=bool, default=True, help='If ReLU is applied on heatmaps in Grad-CAM or not!')
-parser.add_argument('--attention', type=str, default='spatial', choices = ('spatial','channel'),
+parser.add_argument('--attention', type=str, default=None, choices = ('spatial','channel'),
                     help='If we want to apply attention or not!')
 parser.add_argument('--all', type=bool, default=False, help='If True, overlay heatmaps of all images over them!')
-parser.add_argument('--subset', type=int, nargs='*', default=[0,1,2,3,4,5],
+parser.add_argument('--subset', type=int, nargs='*', default=[80000,80100,80200,80300,80400],
                         help='Showing a subset of overlaid heatmaps for images!')
 parser.add_argument('--img_idx', type=int, default=62000, help='The index of image that we want to overlay heatmap on!')
 

@@ -36,9 +36,12 @@ parser.add_argument('--latent_dim', type=int, default=10,
                     help='latent vector size of encoder')
 parser.add_argument('--best_model',type=bool, default=True,
                     help='If True load the best checkpoint otherwise last one.')
-parser.add_argument('--target_layer', type=str, default='encoder.conv2',
+parser.add_argument('--target_layer', type=str, default='encoder.conv3',
                     choices=('conv1','conv2','conv3','conv4'),
                     help='select a target layer for generating attention map.')
+parser.add_argument('--backprop_type', type=str, default='latent_dim', choices= ('test_statistic','latent_dim'))
+parser.add_argument('--latent_dim_idx', type=int, default=9,
+                   help='Dimension of the latent vecor that we want to backprobagte')
 parser.add_argument('--single_output', type=bool, default=False,
                     help='if true, only returns mean in VAE.')
 
@@ -117,6 +120,7 @@ def main(args):
     
     # Instantiate GradCAM
     gcam = GradCAM(vae, target_layer=args.target_layer, relu=args.relu, device=device, attention=args.attention)
+    print(f'{args.target_layer} was chosen for backprobagation.')
     
     # Initialize variables to store sums and counts
     sum_fX = torch.zeros(args.latent_dim).to(device)
@@ -181,10 +185,19 @@ def main(args):
     torch.cuda.empty_cache()
     
     print(f'Dimension of D:{D.size()}\n')
+    
+    print(f'D:{D}')
                 
     statistic = torch.sum(torch.pow(D, 2))
     
     print(f'test_statistic:{statistic}')
+    
+    if args.backprop_type=='test_statistic':
+        backprob_value = statistic
+        print(f'test_statistic is backprobagated')
+    else:
+        backprob_value = D[args.latent_dim_idx]
+        print(f'latent_dimension {args.latent_dim_idx} is backprobagated')
     
     def process_in_batches(tensor_data, batch_size):
         attributions_list = []
@@ -196,7 +209,7 @@ def main(args):
             # Perform forward pass again
             print(f'forwarding batch_data')
             _, mu, _ = gcam.forward(batch_data)
-            gcam.backward(statistic)
+            gcam.backward(backprob_value)
             print(f'backward statistic')
             attributions = gcam.generate()
             attributions = attributions.squeeze().cpu().data.numpy()
@@ -222,10 +235,12 @@ def main(args):
         attributions = process_in_batches(original_images, args.bs)
         
     # Let's look at attribution map shape and save them
-    base_path = os.path.join(svd_dir_heatmap, f'{args.seed}_{args.exp}_{args.latentvar}')
+    base_path = os.path.join(svd_dir_heatmap, f'{args.seed}_{args.exp}_{args.latentvar}_{args.target_layer[8:]}')
     os.makedirs(base_path,exist_ok=True)
     if args.attention:
         file_name = f'{args.latentcls}_{args.group}_{args.relu}_{args.attention}_heatmap.npy'
+    elif args.backprop_type =='latent_dim':
+        file_name = f'{args.latentcls}_{args.group}_{args.relu}_{args.latent_dim_idx}_heatmap.npy'
     else:
         file_name = f'{args.latentcls}_{args.group}_{args.relu}_heatmap.npy'
     full_path = os.path.join(base_path, file_name)
