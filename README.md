@@ -13,7 +13,7 @@ This project visualizes a Two-Sample Test using GradCAM, employing a Variational
 - **dataloader.py**: Data loader for train, validation, and test datasets.
 - **masking_feature.py**: Masks the most important features using GradCAM.
 - **applying_mask.py**: Applies the generated mask to the dataset.
-- **/notebooks/**: Jupyter notebooks for model checks, clustering, and heatmap visualization.
+- **notebooks**: Jupyter notebooks for model checks, clustering, and heatmap visualization.
 
 ## How to Run
 
