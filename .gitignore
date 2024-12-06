@@ -32,6 +32,14 @@ info_data.py
 meanstd.py
 embeddingheatmap.py
 Note_about_GradCAM.ipynb
+bash_embeding.sh
+../bash_san.sh
+../chatGPT_BrainStorming.ipynb
+../chcek_synthetic_data.ipynb
+
+# Directories in a parent's directory
+../Syn_Data/
+../syn_embed/
 
 # If these files might appear in subdirectories as well
 **/img.pt
