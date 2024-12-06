@@ -55,31 +55,6 @@ class dSprites(Dataset):
     
 
 ### making train, test, validation sets 
-parser = argparse.ArgumentParser(description='Making datasets and dataloaders')
-
-parser.add_argument('--seed',type=int,default=42,
-                    help='the seed for experiments!')
-
-parser.add_argument('--valsize',type=float,default=0.1,
-                    help='the size of validation set!')
-
-parser.add_argument('--testsize',type=float,default=0.3,
-                    help='the size of test set!')
-
-parser.add_argument('--latentvar',type=str,default='shape',choices=('shape','scale','orientation','position'),
-                    help='the latent varibale for defining groups!')
-
-parser.add_argument('--latentcls',type=float,nargs="+",default=[1,2],
-                    help='the latent class for defining groups!, 1,2 correspond to square and ellipse')
-
-parser.add_argument('--norm',type=bool,default=False,
-                    help='the latent class for defining groups!')
-
-parser.add_argument('--save',type=bool,default=True,
-                    help='if we want to save train, val, test sets or not!')
-
-args = parser.parse_args() 
-
 def get_train_test_set(args):
     
     root_dir = Path('/dhc/home/masoumeh.javanbakhat/netstore-old/Baysian/3D')
@@ -191,6 +166,22 @@ def get_train_test_set(args):
 
 
 if __name__=="__main__":
+    parser = argparse.ArgumentParser(description='Making datasets and dataloaders')
+    parser.add_argument('--seed',type=int,default=42,
+                    help='the seed for experiments!')
+    parser.add_argument('--valsize',type=float,default=0.1,
+                    help='the size of validation set!')
+    parser.add_argument('--testsize',type=float,default=0.3,
+                    help='the size of test set!')
+    parser.add_argument('--latentvar',type=str,default='shape',choices=('shape','scale','orientation','position'),
+                    help='the latent varibale for defining groups!')
+    parser.add_argument('--latentcls',type=float,nargs="+",default=[1,2],
+                    help='the latent class for defining groups!, 1,2 correspond to square and ellipse')
+    parser.add_argument('--norm',type=bool,default=False,
+                    help='the latent class for defining groups!')
+    parser.add_argument('--save',type=bool,default=True,
+                    help='if we want to save train, val, test sets or not!')
+    args = parser.parse_args() 
     
     get_train_test_set(args)
     
