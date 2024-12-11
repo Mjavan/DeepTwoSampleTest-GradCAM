@@ -6,7 +6,7 @@ from sklearn.decomposition import PCA
 import torch
 
 class MMDTest:
-    def __init__(self, features_X, features_Y, n_perm=1000):
+    def __init__(self, features_X, features_Y, n_perm=100000):
         
         self.n_perm = n_perm
         self.features_X = features_X
@@ -38,7 +38,9 @@ class MMDTest:
             resampled_vals[i] = self._compute_mmd(feats_X, feats_Y)
             
         resampled_vals.sort()
-        p_val = np.mean(stat < resampled_vals)
+        #p_val = np.mean(stat < resampled_vals)
+        #p_val = number of extreem perm / total numb of perm
+        p_val = (np.sum(stat<= resampled_vals)+1)/(self.n_perm+1)
         return p_val
     
     def test(self):
