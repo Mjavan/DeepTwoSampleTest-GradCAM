@@ -176,7 +176,7 @@ class InfluenceRanker:
             updated_gr1_embed, updated_gr2_embed, _, _ = self._exclude_top_percent(perc)
             p_val = self._compute_p_value(updated_gr1_embed, updated_gr2_embed)
             dic_p[perc] = p_val
-            print(f' p_val:{p_val}')
+            print(f' p_val:{p_val:.8f}')
             
         df = pd.DataFrame([dic_p])
         # make directory, save reuslts
@@ -236,7 +236,7 @@ class InfluenceRanker:
             updated_gr1_embed, updated_gr2_embed, _, _ = self._exclude_low_percent(perc)
             p_val = self._compute_p_value(updated_gr1_embed, updated_gr2_embed)        
             dic_p[perc] = p_val 
-            print(f' p_val:{p_val}')
+            print(f' p_val:{p_val:.8f}')
             
         df = pd.DataFrame([dic_p])
         # save p-values dic
@@ -245,10 +245,6 @@ class InfluenceRanker:
         if not os.path.exists(df_path):
             df.to_csv(df_path, index=False)
         
-        
-
-        
-
 
 parser = argparse.ArgumentParser(description='Effect of excluding top/low important samples.')
 parser.add_argument('--seed_data',type=int,default=42,
@@ -257,7 +253,7 @@ parser.add_argument('--n_samples',type=int,default=200,
                     help='Number of samples in each group')
 parser.add_argument('--pr',type=int,default=80,
                     help='Portion of second group to be added to first group.')
-parser.add_argument('--excper', type=int,nargs='+',default=list(np.arange(1,41)), help='The percentage of samples that we want to exclude!')
+parser.add_argument('--excper',type=int,nargs='+',default=list(np.arange(1,41)), help='The percentage of samples that we want to exclude!')
 args = parser.parse_args()
             
 if __name__=="__main__":
