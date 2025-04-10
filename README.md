@@ -1,6 +1,6 @@
 # DeepTwoSampleTest-GradCAM
 ## Overview
-This project visualizes a Two-Sample Test using GradCAM, employing a Variational Autoencoder (VAE) and the dSprites dataset. The VAE is trained on one class from dSprites, and GradCAM is used to generate heatmaps which visualises most importnat features that distinguish between different classes.
+This project visualizes a Two-Sample Test using GradCAM, employing a Variational Autoencoder (VAE) and the dSprites dataset. The VAE is trained on one class from dSprites, and GradCAM is used to generate heatmaps which visualises most importnat features that distinguish between different classes. The dataset and approach used here serve as a proof-of-concept for the project 'Towards Visually Explaining Statistical Tests,' which will be applied to real medical image datasets.
 
 ## Project Structure
 - **train.py**: Script to train the VAE model.
